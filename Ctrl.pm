@@ -5,7 +5,7 @@ use vars qw($VERSION $AUTOLOAD);
 use Digest::MD5();
 use IO::Socket;
 
-$VERSION = 2.1;
+$VERSION = 2.2;
 
 =head1 NAME
 
@@ -13,9 +13,9 @@ XMail::Ctrl - Crtl access to XMail server
 
 =head1 VERISON
 
-version 2.1 of XMail::Ctrl
+version 2.2 of XMail::Ctrl
 
-released 10/12/2003
+released 11/7/2003
 
 =head1 SYNOPSIS
 
@@ -445,6 +445,7 @@ sub xcommand {
     my @build_command = qw(
       domain
       alias
+      account
       mlusername
       username
       password

@@ -1,5 +1,10 @@
 Revision history for Perl extension XMail::Ctrl.
 
+2.2 - November 7th 2003
+
++ Added support for the "account" portion of the addalias
+function - Thanks to David Michael so bringing it to my attention
+
 2.1 - October 7th 2003
 
 o Corrected issue with socket when it has become
