@@ -1,5 +1,8 @@
 Revision history for Perl extension XMail::Ctrl.
 
+1.3 - Modified list support to return array ref instead of
+      a raw string.
+
 1.2 - Added support for tab file edits
 
 1.0 - Initial release

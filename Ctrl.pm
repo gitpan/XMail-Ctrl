@@ -80,7 +80,7 @@ XMail core the module should work to any new commands unchanged.
 The "method" that you pass is automagicly (AUTOLOAD) turned
 into a part of the arguments you are sending into the object.
 
-That is when you call $xmail->useradd( { %args } );
+That is when you call $xmail->useradd( \%args );
 
 It is passed to the xcommand method as a hash with the "method"
 you called added to the %args, so $args{command} would equal
@@ -107,9 +107,22 @@ To send uservarsset add a vars anonymous hash, such as:
 
 The ".|rm" command can used as described in the XMail docs.
 
-The lists are returned in a single string.  If I get enough
-requests I will modify this behavior.  I have thought about
-either an array or arrays or hash of arrays.
+=head2 Lists
+
+Lists are now returned as an array reference unless you set the
+raw_list method to true.
+
+    $xmail->raw_list(1);
+
+To print the lists you can use a loop like this:
+    
+    my $list = $xmail->usrlist( { domain => '' } );
+    foreach my $row (@{$list}) {
+	print join("\t",@{$row}) . "\n";	
+    }
+
+Refer to the XMail documentation for each command for information
+on which columns will be returned for a particular command.
 
 =head1 BUGS
 
@@ -161,134 +174,159 @@ and/or modified under the same terms as Perl itself.
 # Once you create a new xmail connection don't
 # let it sit around too long or it will time out!
 
-$VERSION = 0.60;
+$VERSION = 1.3;
 
 sub new {
 
-	my ($class,%args) = @_;
+    my ($class,%args) = @_;
 
-	my $s = IO::Socket::INET->new( 
-	            PeerAddr => "$args{host}",
-                PeerPort => "$args{port}",
-                Proto => 'tcp'
-                );
-	die "Can't connect: $@" unless $s;
-	# clear the connect string from the buffer
-	my ($ctest,$buf);
-	while (1) {
-		sysread $s, $buf, 1;
-		if ($buf =~ /\n$/) {
-			last;
-		}
+    my $s = IO::Socket::INET->new( 
+	PeerAddr => "$args{host}",
+	PeerPort => "$args{port}",
+	Proto => 'tcp'
+	    );
+    die "Can't connect: $@" unless $s;
+    # clear the connect string from the buffer
+    my ($ctest,$buf);
+    while (1) {
+	sysread $s, $buf, 1;
+	if ($buf =~ /\n$/) {
+		last;
 	}
-	$s->flush;
-	$buf = '';
-	$s->print("$args{ctrlid}\t$args{ctrlpass}\r\n");
+    }
+    $s->flush;
+    $buf = '';
+    $s->print("$args{ctrlid}\t$args{ctrlpass}\r\n");
 
-	# clear the buffer and test for successful connect
-	while (1) {
-		sysread $s, $buf, 1;
-		if ($buf =~ /\n$/) {
-			last;
-		}
-		
-		$ctest .= $buf;
+    # clear the buffer and test for successful connect
+    while (1) {
+	sysread $s, $buf, 1;
+	if ($buf =~ /\n$/) {
+		last;
 	}
-	$s->flush;
-	if ($ctest !~ m/^\+/) {
-		die "Error: $ctest";
-	}
+	
+	$ctest .= $buf;
+    }
+    $s->flush;
+    if ($ctest !~ m/^\+/) {
+	    die "Error: $ctest";
+    }
 
-	my $outmail = {
-		_ctrlid   => $args{ctrlid},
-		_ctrlpass => $args{ctrlpass},
-		_port     => $args{port},
-		_host     => $args{host},
-		_io       => $s,
+    my $outmail = {
+	_ctrlid   => $args{ctrlid},
+	_ctrlpass => $args{ctrlpass},
+	_port     => $args{port},
+	_host     => $args{host},
+	_io       => $s,
 
-	};
+    };
 
-	bless ($outmail , $class);
+    bless ($outmail , $class);
 }
 
 sub xcommand {
 
-	my ($self,$args) = @_;
+    my ($self,$args) = @_;
 
-	my $s = $self->{_io};
-	
-	my @build_command = qw(
-	domain
-	alias
-	mlusername
-	username
-	password
-	mailaddress
-	perms
-	usertype
-	loc-domain
-	loc-username
-	extrn-domain
-	extrn-username
-	extrn-password
-	authtype
-	relative-file-path
-	vars);
-	
-	my $command = $args->{command};
-	delete $args->{command};
-	foreach my $step (@build_command) {
-	
-		if (ref $args->{$step} ne "HASH") {
-			$command .= "\t$args->{$step}" if $args->{$step};
-		} else {
-			foreach my $varname (keys %{$args->{$step}}) {
-				$command .= 
-				"\t$varname\t$args->{$step}{$varname}";
-
-			}
-		}
-		
-		delete $args->{$step};
-	}
-	$command .= "\r\n";
-
-	$s->print($command);
+    my $s = $self->{_io};
     
-	my ($test,$buf,$list,$proc);
-	while (1) {
-		sysread $s, $buf, 1;
-		# stop reading if we have a newline unless we expect
-		# a list
-		if ($buf =~ /\n$/ && !$list && !$proc) {
-			last;
-		}
-		
-		$test .= $buf;
-		# lists have a response of +00100 from the server
-		if ($test =~ /\+00100/) { $list = 1 }
-		if ($test =~ /\+00101/) { $proc = 1 }
-		if ($buf =~ /\n$/ && $proc) {
-		    $s->print($args->{output_to_file} . "\n.\r\n");
-		    $proc = '';
-		    last;
-		}
-		
-		# stop reading if the string ends with
-		# . return newline
-		if ($test =~ /\.\r\n$/ && $list) {
-			last;
-		}
+    my @build_command = qw(
+    domain
+    alias
+    mlusername
+    username
+    password
+    mailaddress
+    perms
+    usertype
+    loc-domain
+    loc-username
+    extrn-domain
+    extrn-username
+    extrn-password
+    authtype
+    relative-file-path
+    vars);
+    
+    my $command = $args->{command};
+    delete $args->{command};
+    foreach my $step (@build_command) {
+    
+	if (ref $args->{$step} ne "HASH") {
+	    $command .= "\t$args->{$step}" if $args->{$step};
+	} else {
+	    foreach my $varname (keys %{$args->{$step}}) {
+		$command .= 
+		"\t$varname\t$args->{$step}{$varname}";
+	    }
+	}
 	
-	}
-	$list = '';
-		
-	if ($test !~ m/^\+/) {
-		return "Error: $command $test"
-	}
+	delete $args->{$step};
+    }
+    $command .= "\r\n";
 
-	$s->flush;
-	return $test;
+    $s->print($command);
+
+    my ($test,$buf,$list,$proc);
+    while (1) {
+	sysread $s, $buf, 1;
+	# stop reading if we have a newline unless we expect
+	# a list
+	if ($buf =~ /\n$/ && !$list && !$proc) {
+		last;
+	}
+	
+	$test .= $buf;
+	
+	#if ($test =~ /^\-/ && length($test) > 6) {
+	#    return "Error: $test";
+	#}
+	# lists have a response of +00100 from the server	
+	if ($test =~ /\+00100/) { $list = 1 }
+	if ($test =~ /\+00101/) { $proc = 1 }
+	if ($buf =~ /\n$/ && $proc) {
+	    $s->print($args->{output_to_file} . "\n.\r\n");
+	    $proc = '';
+	    last;
+	}
+	
+	# stop reading if the string ends with
+	# . return newline
+	if ($test =~ /\.\r\n$/ && $list) {
+	    last;
+	}
+    
+    }
+    if ($list && !$self->raw_list()) {
+	my $array_ref;
+	my @rows = split(/\r\n/,$test);
+	pop @rows;
+	shift @rows;
+	my $count = 0;
+	foreach my $row (@rows) {
+	    $array_ref->[$count] = [ split(/\t/,$row) ];
+	    $count++;
+	}
+	$test = $array_ref if $array_ref;    
+    }
+    $list = '';
+	    
+    if ($test !~ m/^\+/ && ref($test) ne "ARRAY") {
+	return "Error: $command $test"
+    }
+
+    $s->flush;
+    return $test;
+}
+
+sub raw_list {
+    my ($self,$value) = @_;
+    if ($value) {
+	$self->{raw_list} = $value;
+    }
+    else {
+	return $self->{raw_list};
+    }
 }
 
 sub quit {
