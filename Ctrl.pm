@@ -5,7 +5,7 @@ use vars qw($VERSION $AUTOLOAD);
 use Digest::MD5();
 use IO::Socket;
 
-$VERSION = 2.0;
+$VERSION = 2.1;
 
 =head1 NAME
 
@@ -13,9 +13,9 @@ XMail::Ctrl - Crtl access to XMail server
 
 =head1 VERISON
 
-version 2.0 of XMail::Ctrl
+version 2.1 of XMail::Ctrl
 
-released 04/13/2003
+released 10/12/2003
 
 =head1 SYNOPSIS
 
@@ -387,9 +387,23 @@ sub debug {
 sub _send {
     my ( $self, $data ) = @_;
     $data .= "\r\n" unless $data =~ /\r?\n$/;
-    $self->last_error("socket::send failed, no connection")
-      and return 0
-      unless $self->connected && $self->{_io}->send($data);
+
+    # if the socket has been shutdown by the server, send returns
+    # a defined value,(perlfunc says otherwise) but it will atleast
+    # reset the connected state to false, so by additionally check
+    # connection state after send, we can detect a dead peer and
+    # perform a transparent reconnect and retransmit of the last command...
+    unless(defined $self->{_io}->send($data) && $self->connected){
+
+       # socket is down, reconnect and retransmit
+       print STDOUT "info :   reconnecting [$self->{_host}:$self->{_port}]\n"
+	   if $self->debug > 2;
+	 # still failing ? then report a permanent error...
+       $self->last_error("socket::send failed, no connection")
+         and return 0
+         unless $self->connect && defined $self->{_io}->send($data);
+	}
+
     print STDOUT "debug:<< $data" if $self->debug > 1;
     1;
 }
@@ -399,9 +413,11 @@ sub _recv {
     my ( $self, $bufsz ) = @_;
     my $buf;
     return undef unless $self->connected;
+
     $self->last_error("socket::recv failed, no connection")
       and return undef
-      unless $self->connected && $self->{_io}->recv( $buf, $bufsz || 128 );
+      unless $self->connected && defined $self->{_io}->recv( $buf, $bufsz || 128 );
+      
     print STDOUT "debug:>> $buf" if $self->debug > 1;
     $buf;
 }
@@ -447,7 +463,7 @@ sub xcommand {
       lev1
       msgfile
     );
-
+    
     my $command = delete $args->{command};
     foreach my $step (@build_command) {
         if ( ref $args->{$step} ne "HASH" ) {
@@ -462,7 +478,7 @@ sub xcommand {
     }
 
     # no connection, try bring one up, return on failure
-    $self->connected or $self->connect or return undef;
+    $self->connect or return undef;
 
     # make debug output reader friendly
     print STDOUT "\n" if $self->debug > 1;

@@ -1,5 +1,10 @@
 Revision history for Perl extension XMail::Ctrl.
 
+2.1 - October 7th 2003
+
+o Corrected issue with socket when it has become
+undefined and insured reconnect after a time out - Thomas Loo
+
 2.0 - April 13th 2003
 
 + Use of Digest::MD5 for passwords.  Digest::MD5 is now
