@@ -1,5 +1,23 @@
 Revision history for Perl extension XMail::Ctrl.
 
+2.0 - April 13th 2003
+
++ Use of Digest::MD5 for passwords.  Digest::MD5 is now
+a requirement.
+
+o Refactored code into better, smaller internal methods
+Thomas Loo
+
+o Simplified the return values from commands to a 1 or undef
+Thomas Loo
+
+o Moved connect into its own internal function allowing
+for a script to run and reconnect as needed if the connection
+to the Ctrl service times out. This should not effect existing
+scripts - Thomas Loo
+
+o Improved debugging output - Thomas Loo
+
 1.5
 
 + Added support for froz* commands

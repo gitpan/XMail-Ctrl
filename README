@@ -19,8 +19,7 @@ DEPENDENCIES
 This module requires these other modules and libraries:
 
   IO::Socket
-  Carp
-  (should be included in a stock Perl install, but you
+ (should be included in a stock Perl install, but you
      never know )
 
 COPYRIGHT AND LICENCE
