@@ -5,17 +5,15 @@ use vars qw($VERSION $AUTOLOAD);
 use Carp;
 use strict;
 
-$VERSION = 1.4;
+$VERSION = 1.5;
 
 =head1 NAME
 
 XMail::Ctrl - Crtl access to XMail server
 
-www.xmailserver.com
-
 =head1 VERISON
 
-version 1.4 of XMail::Ctrl
+version 1.5 of XMail::Ctrl
 
 released 08/21/2002
 
@@ -60,42 +58,45 @@ released 08/21/2002
 
 =head1 DESCRIPTION
 
-This module allows for easy access to the Crtl functions for XMail.
-It operates over TCP/IP so it can be used to communicate with either
-Windows or Linux based XMail servers.
+This module allows for access to the Crtl functions for XMail.
+It operates over TCP/IP. It can be used to communicate with either
+Windows or Linux based XMail based servers.
 
 The code was written on a Win32 machine and has been tested on
-Mandrake and Red Hat Linux as well with Perl version 5.6
+Mandrake and Red Hat Linux as well with Perl version 5.6 and 5.8
 
 =head2 Overview
 
 All commands take the same arguments as outlined in the XMail
-documentation.  All commands are processed by name and arguments can
-be sent in the any order.  As is outlined above in the useradd
-statement.
+(http://www.xmailserver.com) documentation.  All commands are
+processed by name and arguments can be sent in the any order.
+
+Example command from manual (is one line):
+"useradd"[TAB]"domain"[TAB]"username"[TAB]"password"[TAB]"usertype"<CR><LF>
+
+This turns into:
+	
+	$xmail->useradd( {
+		domain => "domain.com",
+		username => "username",
+		password => "password",
+		usertype => "U"
+		}
+		);
+
+You can put the command parts in any order, they are put in the
+correct order by the modules internals.
 
 The command structure for XMail allows a fairly easy interface
 to the command set.  This module has NO hardcoded xmail methods.
 As long as the current ordering of commands is followed in the
 XMail core the module should work to any new commands unchanged.
 
-The "method" that you pass is automagicly (AUTOLOAD) turned
-into a part of the arguments you are sending into the object.
+Any command that accepts vars can be used
+by doing the following:
 
-That is when you call $xmail->useradd( \%args );
-
-It is passed to the xcommand method as a hash with the "method"
-you called added to the %args, so $args{command} would equal
-useradd in this case.  You can pass args in any order due to
-XMails consistent ordering of ctrl variables.  The commands
-are always in the same order.  So we loop through the array of
-variables in the order XMail expects them and add them to the
-"command" if a corresponding %args value is present.  Please
-see the source for more information.
-
-Any command that accepts vars can use the following:
-
-To send uservarsset add a vars anonymous hash, such as:
+To send uservarsset (user.tab) add a vars anonymous hash,
+such as:
 
 	$xmail->uservarsset( {
 	domain   => 'aopen.hank.net',
@@ -109,10 +110,17 @@ To send uservarsset add a vars anonymous hash, such as:
 
 The ".|rm" command can used as described in the XMail docs.
 
+If you are having problems you might want to turn on debugging
+(new in 1.5)
+
+	$xmail->debug(1);
+	
+to help you track down the cause.
+
 =head2 Lists
 
-Lists are now returned as an array reference unless you set the
-raw_list method to true.
+Lists are now (as of 1.3) returned as an array reference unless
+you set the raw_list method to true.
 
     $xmail->raw_list(1);
 
@@ -125,6 +133,24 @@ To print the lists you can use a loop like this:
 
 Refer to the XMail documentation for each command for information
 on which columns will be returned for a particular command.
+
+You can send a noop (keeps the connection alive) with:
+
+    $xmail->noop();
+
+As of version 1.5 you can perform any froz command:
+	
+	$froz = $xmail->frozlist();
+
+	foreach my $frozinfo (@{$froz}) {
+        s/\"//g foreach @{$frozinfo};
+        $res = $xmail->frozdel( {
+                        lev0 => $frozinfo->[1] || '0',
+                        lev1 => $frozinfo->[2] || '0',
+                        msgfile => $frozinfo->[0],
+                        });
+        print $res , "\n";
+	}
 
 =head1 BUGS
 
@@ -158,15 +184,7 @@ editing the 'tab' files
 
 =head1 CHANGES
 
-1.4 - Modified/corrected documenation
-
-1.3 - Added support for list commands to return
-      referenced array of arrays instead of text
-      string.
-
-1.2 - Added support for the usersetmproc command
-
-1.0 - Initial release
+Changes file included in distro
 
 =head1 COPYRIGHT
 
@@ -187,18 +205,28 @@ sub new {
     my ($class,%args) = @_;
 
     my $s = IO::Socket::INET->new( 
-	PeerAddr => "$args{host}",
-	PeerPort => "$args{port}",
-	Proto => 'tcp'
+			PeerAddr => "$args{host}",
+			PeerPort => "$args{port}",
+			Proto => 'tcp'
 	    );
     die "Can't connect: $@" unless $s;
     # clear the connect string from the buffer
+
+    my $outmail = {
+	_ctrlid   => $args{ctrlid},
+	_ctrlpass => $args{ctrlpass},
+	_port     => $args{port},
+	_host     => $args{host},
+	debug     => $args{debug} || 0,
+	};
+		
+	
     my ($ctest,$buf);
     while (1) {
-	sysread $s, $buf, 1;
-	if ($buf =~ /\n$/) {
-		last;
-	}
+		sysread $s, $buf, 100;
+		if ($buf =~ /\n$/) {
+			last;
+		}
     }
     $s->flush;
     $buf = '';
@@ -206,28 +234,30 @@ sub new {
 
     # clear the buffer and test for successful connect
     while (1) {
-	sysread $s, $buf, 1;
-	if ($buf =~ /\n$/) {
-		last;
-	}
-	
-	$ctest .= $buf;
+		sysread $s, $buf, 100;
+		$ctest .= $buf;
+		print "LOGIN BUFFER: $buf\n" if $args{debug};
+		if ($ctest =~ /\n$/) {
+			last;
+		}
     }
     $s->flush;
     if ($ctest !~ m/^\+/) {
 	    die "Error: $ctest";
     }
 
-    my $outmail = {
-	_ctrlid   => $args{ctrlid},
-	_ctrlpass => $args{ctrlpass},
-	_port     => $args{port},
-	_host     => $args{host},
-	_io       => $s,
-
-    };
+	$outmail->{_io} = $s;
 
     bless ($outmail , $class);
+}
+
+sub debug {
+	my ($self,$val) = @_;
+	if ($val || ord($val) == 48) {
+		$self->{debug} = $val;
+	} else {
+		return $self->{debug};
+	}
 }
 
 sub xcommand {
@@ -252,7 +282,11 @@ sub xcommand {
     extrn-password
     authtype
     relative-file-path
-    vars);
+    vars
+	lev0
+	lev1
+	msgfile
+	);
     
     my $command = $args->{command};
     delete $args->{command};
@@ -273,52 +307,55 @@ sub xcommand {
 
     $s->print($command);
 
-    my ($test,$buf,$list,$proc);
+    my ($test,$list,$proc);
     while (1) {
-	sysread $s, $buf, 1;
-	# stop reading if we have a newline unless we expect
-	# a list
-	if ($buf =~ /\n$/ && !$list && !$proc) {
-		last;
-	}
+		my $buf;
+		sysread $s, $buf, 1000;
+		# stop reading if we have a newline unless we expect
+		# a list
+		print "BUFFER: $buf\n" if $self->debug();
+		$test .= $buf;
+		last if !$buf;
+		if ($test =~ /\+00100/) { $list = 1 }
+		if ($test =~ /\+00101/) { $proc = 1 }
 	
-	$test .= $buf;
+		if ($buf =~ /\n$/ && !$list && !$proc) {
+			last;
+		}
 	
-	#if ($test =~ /^\-/ && length($test) > 6) {
-	#    return "Error: $test";
-	#}
-	# lists have a response of +00100 from the server	
-	if ($test =~ /\+00100/) { $list = 1 }
-	if ($test =~ /\+00101/) { $proc = 1 }
-	if ($buf =~ /\n$/ && $proc) {
-	    $s->print($args->{output_to_file} . "\n.\r\n");
-	    $proc = '';
-	    last;
-	}
+		
 	
-	# stop reading if the string ends with
-	# . return newline
-	if ($test =~ /\.\r\n$/ && $list) {
-	    last;
-	}
+		if ($buf =~ /\n$/ && $proc) {
+			$s->print($args->{output_to_file} . "\n.\r\n");
+			$proc = '';
+			last;
+		}
+		
+		# stop reading if the string ends with
+		# . return newline
+		if ($test =~ /\.\r\n$/ && $list) {
+			last;
+		}
+		
+    }
     
-    }
     if ($list && !$self->raw_list()) {
-	my $array_ref;
-	my @rows = split(/\r\n/,$test);
-	pop @rows;
-	shift @rows;
-	my $count = 0;
-	foreach my $row (@rows) {
-	    $array_ref->[$count] = [ split(/\t/,$row) ];
-	    $count++;
-	}
-	$test = $array_ref if $array_ref;    
+		my $array_ref;
+		my @rows = split(/\r\n/,$test);
+		pop @rows;
+		shift @rows;
+		my $count = 0;
+		foreach my $row (@rows) {
+			$array_ref->[$count] = [ split(/\t/,$row) ];
+			$count++;
+		}
+		$test = $array_ref if $array_ref;    
     }
+
     $list = '';
 	    
     if ($test !~ m/^\+/ && ref($test) ne "ARRAY") {
-	return "Error: $command $test"
+		return "Error: $command $test"
     }
 
     $s->flush;
