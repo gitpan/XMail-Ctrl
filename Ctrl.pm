@@ -5,7 +5,7 @@ use vars qw($VERSION $AUTOLOAD);
 use Digest::MD5();
 use IO::Socket;
 
-$VERSION = 2.2;
+$VERSION = 2.3;
 
 =head1 NAME
 
@@ -13,9 +13,9 @@ XMail::Ctrl - Crtl access to XMail server
 
 =head1 VERISON
 
-version 2.2 of XMail::Ctrl
+version 2.3 of XMail::Ctrl
 
-released 11/7/2003
+released 07/10/2004
 
 =head1 SYNOPSIS
 
@@ -282,8 +282,13 @@ sub connect {
     defined( my $buf = $self->_recv ) or return 0;
 
     # gather some useful stuff from the helo string
-    $buf =~ /^\+\d+ (<[\d\.@]+>)\D+([\d\.]+) \(([^\)]+)\).+/;
-    $self->{_helo} = { timestamp => $1, version => $2, os => $3 };
+    
+    # version 1.19 and above no longer return OS removed 
+    $buf =~ /^\+\d+ (<[\d\.@]+>)\D+([\d\.]+)/; # \(([^\)]+)\).+/;
+    $self->{_helo} = { timestamp => $1, 
+                       version => $2, 
+		       # os => $3 
+		      };
 
     # create and send MD5 auth string
     $self->_send(

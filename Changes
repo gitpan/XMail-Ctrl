@@ -1,5 +1,10 @@
 Revision history for Perl extension XMail::Ctrl.
 
+2.3 - July 10th 2004
+
+o Corrected issue with connections to XMail server 1.19 or newer
+  (no OS is contained in the connect string)
+
 2.2 - November 7th 2003
 
 + Added support for the "account" portion of the addalias
