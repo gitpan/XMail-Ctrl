@@ -5,6 +5,8 @@ use vars qw($VERSION $AUTOLOAD);
 use Carp;
 use strict;
 
+$VERSION = 1.4;
+
 =head1 NAME
 
 XMail::Ctrl - Crtl access to XMail server
@@ -13,9 +15,9 @@ www.xmailserver.com
 
 =head1 VERISON
 
-version 1.2 of XMail::Ctrl
+version 1.4 of XMail::Ctrl
 
-released 02/03/2002
+released 08/21/2002
 
 =head1 SYNOPSIS
 
@@ -116,7 +118,7 @@ raw_list method to true.
 
 To print the lists you can use a loop like this:
     
-    my $list = $xmail->usrlist( { domain => '' } );
+    my $list = $xmail->userlist( { domain => 'yourdomin.net' } );
     foreach my $row (@{$list}) {
 	print join("\t",@{$row}) . "\n";	
     }
@@ -156,13 +158,19 @@ editing the 'tab' files
 
 =head1 CHANGES
 
+1.4 - Modified/corrected documenation
+
+1.3 - Added support for list commands to return
+      referenced array of arrays instead of text
+      string.
+
 1.2 - Added support for the usersetmproc command
 
 1.0 - Initial release
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000, Aaron Johnson.  All rights Reserved.
+Copyright (c) 2000,2001,2002 Aaron Johnson.  All rights Reserved.
 This module is free software.  It may be used,  redistributed
 and/or modified under the same terms as Perl itself.
 
@@ -173,8 +181,6 @@ and/or modified under the same terms as Perl itself.
 
 # Once you create a new xmail connection don't
 # let it sit around too long or it will time out!
-
-$VERSION = 1.3;
 
 sub new {
 
