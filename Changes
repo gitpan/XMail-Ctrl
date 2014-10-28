@@ -1,5 +1,11 @@
 Revision history for Perl extension XMail::Ctrl.
 
+2.4 - October 27th 2014
+
+o Corrected issues with distribution not installing correcting
+o Tweaked tests
+o Fixed some Perl critic complaints
+
 2.3 - July 10th 2004
 
 o Corrected issue with connections to XMail server 1.19 or newer
